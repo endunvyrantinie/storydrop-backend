@@ -73,7 +73,7 @@ app.post('/generate-story', async (req, res) => {
   }
 });
 
-// â”€â”€â”€ GENERATE COVER IMAGE â€” PRO ONLY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€ GENERATE COVER IMAGE â€” PRO ONLY (Hugging Face) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.post('/generate-image', async (req, res) => {
   const { genre, storyTitle, isPro } = req.body;
 
@@ -96,17 +96,45 @@ app.post('/generate-image', async (req, res) => {
 
   const styleBase = genrePrompts[genre] || 'cinematic landscape, dramatic lighting';
   const titleHint = storyTitle.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 50);
-  const dallePrompt = `Book cover illustration: ${styleBase}. Theme: "${titleHint}". No text, no watermark, no letters, high quality digital art, cinematic lighting, ultra detailed.`;
+  const imagePrompt = `Book cover illustration: ${styleBase}. Theme: ${titleHint}. No text, no watermark, high quality digital art, cinematic lighting.`;
 
   try {
-    const response = await openai.images.generate({
-      model: 'dall-e-2',
-      prompt: dallePrompt,
-      n: 1,
-      size: '1024x1024',
-    });
+    const hfResponse = await fetch(
+      'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.HF_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: imagePrompt,
+          parameters: {
+            width: 768,
+            height: 432,
+            num_inference_steps: 30,
+            guidance_scale: 7.5,
+          }
+        }),
+      }
+    );
 
-    res.json({ success: true, imageUrl: response.data[0].url });
+    if (!hfResponse.ok) {
+      const errText = await hfResponse.text();
+      console.error('HF error:', errText);
+      // Model may be loading â€” tell frontend to retry
+      if (hfResponse.status === 503) {
+        return res.status(503).json({ success: false, error: 'Model is loading, please retry in 20 seconds' });
+      }
+      return res.status(500).json({ success: false, error: 'Image generation failed' });
+    }
+
+    // HF returns raw image bytes
+    const imageBuffer = await hfResponse.arrayBuffer();
+    const base64 = Buffer.from(imageBuffer).toString('base64');
+    const imageUrl = `data:image/jpeg;base64,${base64}`;
+    res.json({ success: true, imageUrl });
+
   } catch (err) {
     console.error('Image error:', err.message);
     res.status(500).json({ success: false, error: 'Failed to generate image' });
