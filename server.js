@@ -30,10 +30,17 @@ app.post('/generate-story', async (req, res) => {
 
   const wordCount = isPro ? '400-500' : '300-400';
   const isBM = lang === 'Bahasa Malaysia';
+  const isIban = lang === 'Bahasa Iban';
+  const isKadazan = lang === 'Bahasa Kadazan';
 
   const langInstr = isBM
-    ? 'Write entirely in natural, warm Bahasa Malaysia (not overly formal). Malaysian cultural elements welcome.'
-    : 'Write in English. Malaysian or Southeast Asian setting welcome.';
+    ? 'LANGUAGE: Write entirely in natural, warm Bahasa Malaysia. Everyday Malaysian expressions. NOT formal or stiff.'
+    : isIban
+    ? 'LANGUAGE: Write entirely in Bahasa Iban â€” the indigenous Iban language of Sarawak, Malaysia. Use authentic Iban vocabulary and cultural references. Include Iban cultural elements like rumah panjai (longhouse), adat, Gawai festival, bejalai (journey), and the rainforests of Sarawak. Sound natural to native Iban speakers.'
+    : isKadazan
+    ? 'LANGUAGE: Write entirely in Bahasa Kadazan â€” the indigenous Kadazan-Dusun language of Sabah, Malaysia. Use authentic Kadazan vocabulary and cultural references. Include Kadazan cultural elements like walai (longhouse), Pesta Kaamatan harvest festival, momogun (indigenous people), Mount Kinabalu, paddy farming culture, and traditional Kadazan customs. Sound natural to native Kadazan speakers.'
+    : 'LANGUAGE: Write in English. Malaysian or Southeast Asian setting encouraged.';
+
 
   let genreInstr = '';
   if (genre === 'Autobiografi') {
