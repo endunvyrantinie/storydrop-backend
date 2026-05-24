@@ -4,7 +4,16 @@ const OpenAI = require('openai');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://storydrop-t8ai.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5500',
+    /\.vercel\.app$/
+  ],
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+}));
 app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
