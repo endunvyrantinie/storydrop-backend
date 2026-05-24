@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -99,39 +100,28 @@ app.post('/generate-image', async (req, res) => {
   const imagePrompt = `Book cover illustration: ${styleBase}. Theme: ${titleHint}. No text, no watermark, high quality digital art, cinematic lighting.`;
 
   try {
-    const hfResponse = await fetch(
+    const hfResponse = await axios.post(
       'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1',
       {
-        method: 'POST',
+        inputs: imagePrompt,
+        parameters: {
+          width: 768,
+          height: 432,
+          num_inference_steps: 30,
+          guidance_scale: 7.5,
+        }
+      },
+      {
         headers: {
           'Authorization': `Bearer ${process.env.HF_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          inputs: imagePrompt,
-          parameters: {
-            width: 768,
-            height: 432,
-            num_inference_steps: 30,
-            guidance_scale: 7.5,
-          }
-        }),
+        responseType: 'arraybuffer',
+        timeout: 60000,
       }
     );
 
-    if (!hfResponse.ok) {
-      const errText = await hfResponse.text();
-      console.error('HF error:', errText);
-      // Model may be loading â€” tell frontend to retry
-      if (hfResponse.status === 503) {
-        return res.status(503).json({ success: false, error: 'Model is loading, please retry in 20 seconds' });
-      }
-      return res.status(500).json({ success: false, error: 'Image generation failed' });
-    }
-
-    // HF returns raw image bytes
-    const imageBuffer = await hfResponse.arrayBuffer();
-    const base64 = Buffer.from(imageBuffer).toString('base64');
+    const base64 = Buffer.from(hfResponse.data).toString('base64');
     const imageUrl = `data:image/jpeg;base64,${base64}`;
     res.json({ success: true, imageUrl });
 
