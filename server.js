@@ -105,7 +105,6 @@ app.post('/generate-image', async (req, res) => {
       n: 1,
       size: '1792x1024',
       quality: 'standard',
-      style: 'vivid',
     });
 
     res.json({ success: true, imageUrl: response.data[0].url });
