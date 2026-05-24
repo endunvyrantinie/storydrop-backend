@@ -19,12 +19,12 @@ app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// â”€â”€â”€ HEALTH CHECK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── HEALTH CHECK ─────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({ status: 'StoryDrop API is running!' });
 });
 
-// â”€â”€â”€ GENERATE STORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── GENERATE STORY ───────────────────────────────────────────────────────
 app.post('/generate-story', async (req, res) => {
   const { genre, lang, idea, selectedObj, isPro } = req.body;
 
@@ -36,9 +36,9 @@ app.post('/generate-story', async (req, res) => {
   const langInstr = isBM
     ? 'LANGUAGE: Write entirely in natural, warm Bahasa Malaysia. Everyday Malaysian expressions. NOT formal or stiff.'
     : isIban
-    ? 'LANGUAGE: Write entirely in Bahasa Iban â€” the indigenous Iban language of Sarawak, Malaysia. Use authentic Iban vocabulary and cultural references. Include Iban cultural elements like rumah panjai (longhouse), adat, Gawai festival, bejalai (journey), and the rainforests of Sarawak. Sound natural to native Iban speakers.'
+    ? 'LANGUAGE: Write entirely in Bahasa Iban — the indigenous Iban language of Sarawak, Malaysia. Use authentic Iban vocabulary and cultural references. Include Iban cultural elements like rumah panjai (longhouse), adat, Gawai festival, bejalai (journey), and the rainforests of Sarawak. Sound natural to native Iban speakers.'
     : isKadazan
-    ? 'LANGUAGE: Write entirely in Bahasa Kadazan â€” the indigenous Kadazan-Dusun language of Sabah, Malaysia. Use authentic Kadazan vocabulary and cultural references. Include Kadazan cultural elements like walai (longhouse), Pesta Kaamatan harvest festival, momogun (indigenous people), Mount Kinabalu, paddy farming culture, and traditional Kadazan customs. Sound natural to native Kadazan speakers.'
+    ? 'LANGUAGE: Write entirely in Bahasa Kadazan — the indigenous Kadazan-Dusun language of Sabah, Malaysia. Use authentic Kadazan vocabulary and cultural references. Include Kadazan cultural elements like walai (longhouse), Pesta Kaamatan harvest festival, momogun (indigenous people), Mount Kinabalu, paddy farming culture, and traditional Kadazan customs. Sound natural to native Kadazan speakers.'
     : 'LANGUAGE: Write in English. Malaysian or Southeast Asian setting encouraged.';
 
 
@@ -65,7 +65,7 @@ app.post('/generate-story', async (req, res) => {
     Comedy: 'COMEDY: Story MUST BE FUNNY. Include jokes, absurd situations, comic misunderstandings, or witty dialogue. Make the reader LAUGH. Humour is the top priority.',
     Mystery: 'MYSTERY: Include a puzzle or secret. Build intrigue and suspense. Include clues and a satisfying reveal at the end.',
     Fantasy: 'FANTASY: Magic, mythical creatures, or fantastical world must be central to the plot.',
-    Autobiografi: 'AUTOBIOGRAFI: Entirely first-person. The narrator IS the object â€” it thinks, feels, and experiences uniquely.',
+    Autobiografi: 'AUTOBIOGRAFI: Entirely first-person. The narrator IS the object — it thinks, feels, and experiences uniquely.',
     Fable: 'FABLE: Animal characters with human-like personalities. Must end with a clear moral lesson.',
     Folklore: 'FOLKLORE: Traditional Malaysian/Nusantara legend feel. Mystical elements, kampung setting, ancient wisdom.',
     'Sci-Fi': 'SCI-FI: Futuristic technology, space, or AI must be central to the story.',
@@ -78,12 +78,12 @@ app.post('/generate-story', async (req, res) => {
 
   const userPrompt = `Write a ${genre} story of ${wordCount} words.
 
-GENRE TONE â€” follow strictly:
+GENRE TONE — follow strictly:
 ${toneGuide}
 ${blendNote}
 ${genreInstr}
 ${langInstr}
-${idea ? 'STORY IDEA â€” follow this closely: ' + idea : 'Create an original imaginative story.'}
+${idea ? 'STORY IDEA — follow this closely: ' + idea : 'Create an original imaginative story.'}
 
 Rules: clear arc, vivid details, natural dialogue, all-ages appropriate, ${wordCount} words.
 
@@ -113,7 +113,7 @@ Only JSON. No backticks.`;
   }
 });
 
-// â”€â”€â”€ GENERATE COVER IMAGE â€” PRO ONLY (Hugging Face) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── GENERATE COVER IMAGE — PRO ONLY (Hugging Face) ──────────────────────
 app.post('/generate-image', async (req, res) => {
   const { genre, storyTitle, isPro } = req.body;
 
@@ -172,7 +172,7 @@ app.post('/generate-image', async (req, res) => {
   }
 });
 
-// â”€â”€â”€ VISUALIZE STORY â€” PRO ONLY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── VISUALIZE STORY — PRO ONLY ───────────────────────────────────────────
 app.post('/visualize', async (req, res) => {
   const { storyText, isPro } = req.body;
 
@@ -203,7 +203,56 @@ app.post('/visualize', async (req, res) => {
   }
 });
 
-// â”€â”€â”€ START â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// ─── GENERATE THREAD STORY ────────────────────────────────────────────────
+app.post('/generate-thread', async (req, res) => {
+  const { genre, lang, brand, desc, idea } = req.body;
+  const isBM = lang === 'Bahasa Malaysia';
+
+  const systemPrompt = `You are a viral social media content writer who specialises in story-selling on Threads. You write stories that hook readers emotionally and naturally weave in product promotions. A comedy thread is funny. A horror thread is unsettling. The brand promotion always feels organic, never forced.`;
+
+  const userPrompt = `Write a ${genre} story split into exactly 4 Thread posts that promotes a brand.
+
+Language: ${lang}${isBM ? ' — use natural warm Bahasa Malaysia, Manglish ok in story parts' : ''}
+Brand: ${brand}
+Product/Service: ${desc}
+${idea ? 'Story idea: ' + idea : 'Create an original engaging story.'}
+
+RULES:
+- Post 1 (HOOK): First line must STOP the scroll. Drop reader straight into the story. Intriguing, emotional or shocking. No intro.
+- Post 2 (BUILD): Develop the story, add tension or emotion
+- Post 3 (CLIMAX): Peak moment of the story
+- Post 4 (RESOLUTION + PROMO): Resolve the story naturally. Then introduce ${brand} as something the character discovered or used — make it feel like a natural story conclusion, not an ad. End with soft CTA like "Link in bio" or "DM for info"
+- Each post 150-250 characters
+- Use line breaks for mobile readability
+- Genre tone must be strong — ${genre} must be clearly felt throughout
+- The promo in post 4 must feel EARNED by the story, not tacked on
+
+Return ONLY a JSON object:
+- "posts": array of exactly 4 strings
+
+Return ONLY JSON. No backticks.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 800,
+      temperature: 0.9,
+    });
+
+    const parsed = JSON.parse(response.choices[0].message.content);
+    res.json({ success: true, posts: parsed.posts });
+  } catch (err) {
+    console.error('Thread error:', err.message);
+    res.status(500).json({ success: false, error: 'Failed to generate thread' });
+  }
+});
+// ─── START ────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`StoryDrop API running on port ${PORT}`);
