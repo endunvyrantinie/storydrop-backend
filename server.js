@@ -83,50 +83,52 @@ app.post('/generate-image', async (req, res) => {
   }
 
   const genrePrompts = {
-    Romance:     'romantic cinematic scene, soft warm golden light, two silhouettes, bokeh background',
-    Horror:      'dark horror scene, eerie moonlight, thick fog, abandoned building, dramatic shadows',
-    Adventure:   'epic tropical jungle adventure, waterfall, dramatic golden hour lighting, lush greenery',
-    Comedy:      'fun cheerful colorful market scene, bright sunny day, happy lively atmosphere',
-    Mystery:     'noir mystery, dark rainy city street, glowing lamp post, long shadows, cinematic',
-    Fantasy:     'magical enchanted forest, glowing orbs, ethereal mist, ancient towering trees',
-    Autobiografi:'dramatic studio still life, single object center spotlight, dark moody background',
-    Fable:       'storybook illustration, animals gathered in forest, watercolor style, warm earthy tones',
-    Folklore:    'mystical Malaysian jungle at night, fireflies, ancient stone temple, dramatic moonlight',
-    'Sci-Fi':    'futuristic cityscape, neon lights, flying vehicles, dramatic cinematic lighting',
+    Romance:     'romantic scene soft golden light two people bokeh',
+    Horror:      'dark horror eerie moonlight fog abandoned house shadows',
+    Adventure:   'tropical jungle adventure waterfall golden hour lush',
+    Comedy:      'cheerful colorful market scene bright sunny happy',
+    Mystery:     'noir mystery rainy city street lamp shadows detective',
+    Fantasy:     'magical enchanted forest glowing orbs ethereal mist',
+    Autobiografi:'still life single object spotlight dark background',
+    Fable:       'animals in forest watercolor storybook warm tones',
+    Folklore:    'Malaysian jungle night fireflies temple moonlight',
+    'Sci-Fi':    'futuristic cityscape neon lights flying vehicles',
   };
 
-  const styleBase = genrePrompts[genre] || 'cinematic landscape, dramatic lighting';
-  const titleHint = storyTitle.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 50);
-  const imagePrompt = `Book cover illustration: ${styleBase}. Theme: ${titleHint}. No text, no watermark, high quality digital art, cinematic lighting.`;
+  const styleBase = genrePrompts[genre] || 'cinematic landscape dramatic lighting';
+  const titleHint = storyTitle.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 40);
+  const imagePrompt = `${styleBase} ${titleHint} book cover art no text high quality`;
 
   try {
-    const hfResponse = await axios.post(
-      'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1',
-      {
-        inputs: imagePrompt,
-        parameters: {
-          width: 768,
-          height: 432,
-          num_inference_steps: 30,
-          guidance_scale: 7.5,
-        }
+    console.log('Calling HF with prompt:', imagePrompt);
+    const hfResponse = await axios({
+      method: 'post',
+      url: 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1',
+      headers: {
+        'Authorization': `Bearer ${process.env.HF_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'image/png',
       },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.HF_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        responseType: 'arraybuffer',
-        timeout: 60000,
-      }
-    );
+      data: JSON.stringify({ inputs: imagePrompt }),
+      responseType: 'arraybuffer',
+      timeout: 90000,
+    });
 
+    console.log('HF response status:', hfResponse.status);
     const base64 = Buffer.from(hfResponse.data).toString('base64');
-    const imageUrl = `data:image/jpeg;base64,${base64}`;
+    const imageUrl = `data:image/png;base64,${base64}`;
     res.json({ success: true, imageUrl });
 
   } catch (err) {
     console.error('Image error:', err.message);
+    if (err.response) {
+      console.error('HF status:', err.response.status);
+      const errData = Buffer.from(err.response.data).toString('utf8');
+      console.error('HF response:', errData);
+      if (err.response.status === 503) {
+        return res.status(503).json({ success: false, error: 'Model loading, retry in 20s' });
+      }
+    }
     res.status(500).json({ success: false, error: 'Failed to generate image' });
   }
 });
