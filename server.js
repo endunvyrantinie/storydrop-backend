@@ -2,7 +2,21 @@ const express = require('express');
 const cors = require('cors');
 const OpenAI = require('openai');
 const axios = require('axios');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const admin = require('firebase-admin');
 require('dotenv').config();
+
+// Firebase Admin SDK for updating user Pro status
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    })
+  });
+}
+const db = admin.firestore();
 
 const app = express();
 app.use(cors({
@@ -252,6 +266,100 @@ Return ONLY JSON. No backticks.`;
     res.status(500).json({ success: false, error: 'Failed to generate thread' });
   }
 });
+// ─── STRIPE CHECKOUT ─────────────────────────────────────────────────────
+app.post('/create-checkout', async (req, res) => {
+  const { uid, email } = req.body;
+  if (!uid || !email) return res.status(400).json({ success: false, error: 'Missing uid or email' });
+
+  console.log('Creating checkout for:', email, uid);
+  console.log('STRIPE_SECRET_KEY set:', !!process.env.STRIPE_SECRET_KEY);
+  console.log('STRIPE_PRICE_ID:', process.env.STRIPE_PRICE_ID);
+  console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      customer_email: email,
+      line_items: [{
+        price: process.env.STRIPE_PRICE_ID,
+        quantity: 1,
+      }],
+      success_url: process.env.FRONTEND_URL + '?payment=success&uid=' + uid,
+      cancel_url: process.env.FRONTEND_URL + '?payment=cancelled',
+      metadata: { uid },
+    });
+
+    console.log('Checkout session created:', session.id);
+    res.json({ success: true, url: session.url });
+  } catch (err) {
+    console.error('Stripe checkout error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── STRIPE WEBHOOK (called by Stripe after payment) ──────────────────────
+app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook error:', err.message);
+    return res.status(400).send('Webhook Error: ' + err.message);
+  }
+
+  // Handle successful subscription
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const uid = session.metadata?.uid;
+    if (uid) {
+      try {
+        await db.collection('users').doc(uid).set({
+          isPro: true,
+          stripeCustomerId: session.customer,
+          stripeSubscriptionId: session.subscription,
+          upgradedAt: new Date().toISOString(),
+        }, { merge: true });
+        console.log('User upgraded to Pro:', uid);
+      } catch (e) {
+        console.error('Firestore update error:', e);
+      }
+    }
+  }
+
+  // Handle subscription cancelled
+  if (event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object;
+    try {
+      const users = await db.collection('users')
+        .where('stripeSubscriptionId', '==', subscription.id).get();
+      users.forEach(async (doc) => {
+        await doc.ref.set({ isPro: false }, { merge: true });
+        console.log('User downgraded:', doc.id);
+      });
+    } catch (e) {
+      console.error('Downgrade error:', e);
+    }
+  }
+
+  res.json({ received: true });
+});
+
+// ─── CHECK PRO STATUS ─────────────────────────────────────────────────────
+app.post('/check-pro', async (req, res) => {
+  const { uid } = req.body;
+  if (!uid) return res.status(400).json({ success: false });
+  try {
+    const doc = await db.collection('users').doc(uid).get();
+    const data = doc.exists ? doc.data() : {};
+    res.json({ success: true, isPro: data.isPro === true });
+  } catch (err) {
+    res.status(500).json({ success: false, isPro: false });
+  }
+});
+
 // ─── START ────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
