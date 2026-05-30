@@ -29,6 +29,52 @@ app.use(cors({
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
+// ─── STRIPE WEBHOOK must be before express.json() ────────────────────────
+app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook error:', err.message);
+    return res.status(400).send('Webhook Error: ' + err.message);
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const uid = session.metadata?.uid;
+    if (uid) {
+      try {
+        await db.collection('users').doc(uid).set({
+          isPro: true,
+          stripeCustomerId: session.customer,
+          stripeSubscriptionId: session.subscription,
+          upgradedAt: new Date().toISOString(),
+        }, { merge: true });
+        console.log('✅ User upgraded to Pro:', uid);
+      } catch (e) {
+        console.error('Firestore update error:', e);
+      }
+    }
+  }
+
+  if (event.type === 'customer.subscription.deleted') {
+    const subscription = event.data.object;
+    try {
+      const users = await db.collection('users')
+        .where('stripeSubscriptionId', '==', subscription.id).get();
+      users.forEach(async (doc) => {
+        await doc.ref.set({ isPro: false }, { merge: true });
+        console.log('User downgraded:', doc.id);
+      });
+    } catch (e) {
+      console.error('Downgrade error:', e);
+    }
+  }
+
+  res.json({ received: true });
+});
+
 app.use(express.json());
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -296,55 +342,6 @@ app.post('/create-checkout', async (req, res) => {
     console.error('Stripe checkout error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-// ─── STRIPE WEBHOOK (called by Stripe after payment) ──────────────────────
-app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.error('Webhook error:', err.message);
-    return res.status(400).send('Webhook Error: ' + err.message);
-  }
-
-  // Handle successful subscription
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    const uid = session.metadata?.uid;
-    if (uid) {
-      try {
-        await db.collection('users').doc(uid).set({
-          isPro: true,
-          stripeCustomerId: session.customer,
-          stripeSubscriptionId: session.subscription,
-          upgradedAt: new Date().toISOString(),
-        }, { merge: true });
-        console.log('User upgraded to Pro:', uid);
-      } catch (e) {
-        console.error('Firestore update error:', e);
-      }
-    }
-  }
-
-  // Handle subscription cancelled
-  if (event.type === 'customer.subscription.deleted') {
-    const subscription = event.data.object;
-    try {
-      const users = await db.collection('users')
-        .where('stripeSubscriptionId', '==', subscription.id).get();
-      users.forEach(async (doc) => {
-        await doc.ref.set({ isPro: false }, { merge: true });
-        console.log('User downgraded:', doc.id);
-      });
-    } catch (e) {
-      console.error('Downgrade error:', e);
-    }
-  }
-
-  res.json({ received: true });
 });
 
 // ─── CHECK PRO STATUS ─────────────────────────────────────────────────────
